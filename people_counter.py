@@ -38,7 +38,6 @@ def main():
         if not success:
             break
 
-        # 🔥 Resize for performance (important for Pi 5)
         frame = cv2.resize(frame, (640, 480))
         h, w = frame.shape[:2]
 
@@ -84,7 +83,7 @@ def main():
                 if track_id in track_history:
                     prev_x = track_history[track_id]
 
-                    # 🔥 Robust crossing check (handles fast jumps)
+                    # Robust crossing check (handles fast jumps)
                     crossed = (prev_x - line_x) * (cx - line_x) < 0
 
                     if crossed:
