@@ -4,8 +4,9 @@ venv/
 env/
 
 # Python cache
-__pycache__/
+*/__pycache__/
 *.pyc
 
 # OS junk
 .DS_Store
+
