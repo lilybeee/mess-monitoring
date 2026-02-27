@@ -1,5 +1,5 @@
-
 import { useNavigate } from 'react-router-dom';
+import { useDashboard } from '../context/DashboardContext';
 import {
     LineChart,
     Line,
@@ -19,14 +19,9 @@ const graphData = [
     { time: '14:00', people: 30 },
 ];
 
-const StudentDashboard = () => {
+const UserDashboard = () => {
     const navigate = useNavigate();
-
-    // Simulated state
-    const currentPeople = 85;
-    const mealType = 'Lunch';
-    const dayStatus = 'Normal Day';
-    const menu = 'Roti, Rice, Daal, Paneer, Gulab Jamun';
+    const { currentPeople, mealType, dayStatus, menu } = useDashboard();
 
     const handleLogout = () => {
         navigate('/login');
@@ -44,7 +39,7 @@ const StudentDashboard = () => {
 
             {/* Main Content */}
             <main className="container p-8 flex flex-col" style={{ gap: '4rem' }}>
-                <h1 className="mb-8" style={{ fontSize: '2rem' }}>Student Dashboard</h1>
+                <h1 className="mb-8" style={{ fontSize: '2rem' }}>User Dashboard</h1>
 
                 {/* Top Section */}
                 <div className="grid md:grid-cols-2 gap-8">
@@ -108,4 +103,4 @@ const StudentDashboard = () => {
     );
 };
 
-export default StudentDashboard;
+export default UserDashboard;

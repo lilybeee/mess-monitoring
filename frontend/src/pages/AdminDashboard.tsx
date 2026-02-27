@@ -1,13 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDashboard } from '../context/DashboardContext';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
+    const { currentPeople, mealType, dayStatus, setDayStatus, menu, setMenu } = useDashboard();
 
-    // Simulated state that admin can view and change
-    const currentPeople = 85;
-    const [mealType, setMealType] = useState('Lunch');
-    const [dayStatus, setDayStatus] = useState('Normal Day');
+    const [draftDayStatus, setDraftDayStatus] = useState(dayStatus);
+    const [draftMenu, setDraftMenu] = useState(menu);
+
+    useEffect(() => {
+        setDraftDayStatus(dayStatus);
+        setDraftMenu(menu);
+    }, [dayStatus, menu]);
+
+    const handleSetState = () => {
+        setDayStatus(draftDayStatus);
+        setMenu(draftMenu);
+    };
 
     const handleLogout = () => {
         navigate('/login');
@@ -59,30 +69,14 @@ const AdminDashboard = () => {
                     <h2 className="mb-6">Controls</h2>
 
                     <div className="grid md:grid-cols-2 gap-8">
-                        {/* Meal Type Toggles */}
-                        <div className="flex-col gap-2">
-                            <label htmlFor="mealType" style={{ fontSize: '1.2rem', fontWeight: 600 }}>Change Meal Type</label>
-                            <select
-                                id="mealType"
-                                className="input"
-                                value={mealType}
-                                onChange={(e) => setMealType(e.target.value)}
-                                style={{ cursor: 'pointer', padding: '1rem', fontSize: '1.1rem' }}
-                            >
-                                {['Breakfast', 'Lunch', 'Snacks', 'Dinner'].map(meal => (
-                                    <option key={meal} value={meal}>{meal}</option>
-                                ))}
-                            </select>
-                        </div>
-
                         {/* Special Day Toggles */}
                         <div className="flex-col gap-2">
                             <label htmlFor="dayStatus" style={{ fontSize: '1.2rem', fontWeight: 600 }}>Toggle Special Day</label>
                             <select
                                 id="dayStatus"
                                 className="input"
-                                value={dayStatus}
-                                onChange={(e) => setDayStatus(e.target.value)}
+                                value={draftDayStatus}
+                                onChange={(e) => setDraftDayStatus(e.target.value)}
                                 style={{ cursor: 'pointer', padding: '1rem', fontSize: '1.1rem' }}
                             >
                                 {['Normal Day', 'Exam Day', 'Feast', 'Holiday'].map(day => (
@@ -90,6 +84,29 @@ const AdminDashboard = () => {
                                 ))}
                             </select>
                         </div>
+
+                        {/* Special Menu Toggles */}
+                        <div className="flex-col gap-2">
+                            <label htmlFor="menu" style={{ fontSize: '1.2rem', fontWeight: 600 }}>Special Menu</label>
+                            <textarea
+                                id="menu"
+                                className="input"
+                                value={draftMenu}
+                                onChange={(e) => setDraftMenu(e.target.value)}
+                                style={{ padding: '1rem', fontSize: '1.1rem', minHeight: '100px', resize: 'vertical' }}
+                                placeholder="Enter the special menu for today..."
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mt-20 flex justify-center">
+                        <button
+                            className="btn"
+                            style={{ padding: '0.8rem 2rem', fontSize: '1.1rem' }}
+                            onClick={handleSetState}
+                        >
+                            Set
+                        </button>
                     </div>
                 </section>
 

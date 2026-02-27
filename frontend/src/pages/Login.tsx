@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
     const [step, setStep] = useState<1 | 2>(1);
-    const [role, setRole] = useState<'student' | 'admin' | null>(null);
+    const [role, setRole] = useState<'user' | 'admin' | null>(null);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
 
-    const handleRoleSelect = (selectedRole: 'student' | 'admin') => {
-        if (selectedRole === 'student') {
-            navigate('/student');
+    const handleRoleSelect = (selectedRole: 'user' | 'admin') => {
+        if (selectedRole === 'user') {
+            navigate('/user');
         } else {
             setRole('admin');
             setStep(2);
@@ -40,9 +40,9 @@ const Login = () => {
                             type="button"
                             className="btn btn-outline p-4"
                             style={{ fontSize: '1.1rem' }}
-                            onClick={() => handleRoleSelect('student')}
+                            onClick={() => handleRoleSelect('user')}
                         >
-                            Student
+                            User
                         </button>
                         <button
                             type="button"
@@ -57,7 +57,7 @@ const Login = () => {
                     <form onSubmit={handleLogin} className="flex flex-col gap-4">
                         <div className="flex justify-between items-center mb-4">
                             <h3 style={{ fontSize: '1.2rem', fontWeight: 600 }}>
-                                {role === 'admin' ? 'Admin Login' : 'Student Login'}
+                                {role === 'admin' ? 'Admin Login' : 'User Login'}
                             </h3>
                             <button
                                 type="button"
