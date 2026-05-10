@@ -39,7 +39,7 @@ The system works in two main stages:
   - Time of day  
   - Day of week  
   - Special events (if any)
-- A **Random Forest model** is trained to predict crowd levels
+- A **Regression Model(Gradient Boosting)** is trained to predict crowd levels
 - Used to estimate peak hours and assist in planning
 
 ---
@@ -49,7 +49,7 @@ The system works in two main stages:
 - Python  
 - OpenCV  
 - YOLO (Object Detection)  
-- scikit-learn (Random Forest)  
+- scikit-learn (Regression Model(Gradient Boosting))  
 - Raspberry Pi (Edge Deployment)  
 
 ---
@@ -66,34 +66,4 @@ The system works in two main stages:
 
 ---
 
-## Challenges Faced
 
-- Maintaining accurate tracking in crowded scenes
-- Handling occlusions and missed detections
-- Optimizing performance for **Raspberry Pi**
-- Balancing accuracy vs speed for real-time inference
-
----
-
-## Key Learnings
-
-- Learned how to build an **end-to-end computer vision pipeline**
-- Understood challenges of **real-time systems on edge devices**
-- Gained experience with **feature engineering and forecasting**
-- Explored trade-offs between **model accuracy and system performance**
-
----
-
-## Future Improvements
-
-- Use more advanced tracking methods (e.g., DeepSORT)
-- Improve forecasting using time-series models (LSTM, ARIMA)
-- Add dashboard for live visualization
-- Optimize model further for edge deployment
-
----
-
-## Notes
-
-- Designed with practical deployment in mind
-- Can be extended to other use-cases like footfall analytics, queue management, etc.
