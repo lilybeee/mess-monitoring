@@ -1,120 +1,172 @@
 import cv2
-from ultralytics import YOLO
+import threading
+import requests
+import time
 import argparse
-from collections import defaultdict
+import datetime
+from ultralytics import YOLO
+from picamera2 import Picamera2
+
+# --- CONFIGURATION ---
+RAILWAY_URL = "https://web-production-6bab62.up.railway.app"
+
+def get_current_context():
+    """
+    Maps current time/day to your Neon database IDs.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+    day_of_week = now.isoweekday() # Monday=1, Sunday=7
+    hour = now.hour
+    minute = now.minute
+
+    # Calculate time as float for 30-minute precision (7:30 = 7.5)
+    current_time = hour + (minute / 60)
+
+    # 1. Determine Meal ID (Breakfast=1, Lunch=2, Snacks=3, Dinner=4)
+    # Breakfast now starts at 7:30 AM
+    if 7.5 <= current_time < 10.0:
+        meal_id = 1
+    elif 12.0 <= current_time < 14.5:
+        meal_id = 2
+    elif 16.0 <= current_time < 18.0:
+        meal_id = 3
+    elif 19.0 <= current_time < 21.0:
+        meal_id = 4
+    else:
+        meal_id = 2 # Default to Lunch if outside hours
+
+    # 2. Determine Menu ID (Logic based on your database schema)
+    menu_id = ((day_of_week - 1) * 4) + meal_id
+
+    # 3. Determine Day Type ID
+    day_type_id = 4 if day_of_week > 5 else 1 # 4=Holiday for Sat/Sun, else 1=Normal
+
+    return menu_id, day_type_id
+
+def send_data_to_server(count, day_id):
+    """Background function to POST data to Railway."""
+    try:
+        params = {
+            "count": count,
+            "day_type_id": day_id
+        }
+        response = requests.post(f"{RAILWAY_URL}/ingest", params=params, timeout=10)
+
+        if response.status_code == 200:
+            ts = datetime.datetime.now().strftime('%H:%M:%S')
+            print(f"[{ts}] Sync Success: {count} people")
+        else:
+            print(f"Server Error: {response.status_code}")
+    except Exception as e:
+        print(f"Network Error: {e}")
 
 def main():
-    parser = argparse.ArgumentParser(description="People Counter using YOLOv8 and OpenCV")
-    parser.add_argument("--source", type=str, default="0")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--line-offset", type=int, default=0)
     parser.add_argument("--confidence", type=float, default=0.5)
     args = parser.parse_args()
 
-    print("Loading YOLO model...")
+    print("Initializing Camera and YOLO (Headless Mode)...")
     model = YOLO("yolov8n.pt")
-    print("Model loaded successfully.")
 
-    try:
-        source = int(args.source)
-    except ValueError:
-        source = args.source
-
-    cap = cv2.VideoCapture(source)
-
-    if not cap.isOpened():
-        print("Error: Could not open video source")
-        return
+    picam2 = Picamera2()
+    config = picam2.create_video_configuration(main={"size": (640, 480)})
+    picam2.configure(config)
+    picam2.start()
 
     track_history = {}
-    track_state = {}
-
     count_in = 0
     count_out = 0
+    last_sync_time = time.time()
 
-    print("Starting tracking. Press 'q' to quit.")
+    print("System Live. Press Ctrl+C to stop.")
 
-    while cap.isOpened():
-        success, frame = cap.read()
-        if not success:
-            break
+    try:
+        slope = -3
+        intercept_offset = args.line_offset
+        base_c = 1100
+        
+        while True:
+            # 1. Capture Frame
+            frame_rgb = picam2.capture_array()
+            
+            if frame_rgb is None:
+                continue
+            
+            frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
 
-        frame = cv2.resize(frame, (640, 480))
-        h, w = frame.shape[:2]
+            h, w = frame.shape[:2]
+            line_x = (w // 2) + args.line_offset
+            #slope = 0.15
+            #intercept_offset = args.line_offset
 
-        # Vertical line
-        line_x = (w // 2) + args.line_offset
+            #base_c = (w // 2) + intercept_offset
 
-        # Run tracking with ByteTrack
-        results = model.track(
-            frame,
-            persist=True,
-            classes=0,
-            conf=args.confidence,
-            iou=0.5,
-            tracker="bytetrack.yaml",
-            verbose=False
-        )
+            # 2. YOLO Tracking
+            results = model.track(
+                frame,
+                persist=True,
+                classes=0,
+                conf=args.confidence,
+                imgsz=320,
+                tracker="bytetrack.yaml",
+                verbose=False
+            )
 
-        # Draw default line
-        cv2.line(frame, (line_x, 0), (line_x, h), (0, 0, 255), 2)
+            # 3. Process Detections
+            if results and results[0].boxes.id is not None:
+                boxes = results[0].boxes.xyxy.cpu()
+                track_ids = results[0].boxes.id.int().cpu().tolist()
 
-        if results[0].boxes.id is not None:
-            boxes = results[0].boxes.xyxy.cpu()
-            track_ids = results[0].boxes.id.int().cpu().tolist()
+                for box, track_id in zip(boxes, track_ids):
+                    x1, y1, x2, y2 = box
+                    cx = int((x1 + x2) / 2)
+                    cy = int(y2)
 
-            for box, track_id in zip(boxes, track_ids):
-                x1, y1, x2, y2 = box
-                cx = int((x1 + x2) / 2)
-                cy = int((y1 + y2) / 2)
+                    current_line_x = int((slope * cy) + base_c)
 
-                # Draw bounding box
-                cv2.rectangle(frame, (int(x1), int(y1)),
-                              (int(x2), int(y2)), (0, 255, 0), 2)
-                cv2.circle(frame, (cx, cy), 5, (255, 0, 255), -1)
-
-                cv2.putText(frame, f"ID: {track_id}",
-                            (int(x1), int(y1) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5, (0, 255, 0), 2)
-
-                if track_id not in track_state:
-                    track_state[track_id] = None
-
-                if track_id in track_history:
-                    prev_x = track_history[track_id]
-
-                    # Robust crossing check (handles fast jumps)
-                    crossed = (prev_x - line_x) * (cx - line_x) < 0
-
-                    if crossed:
-                        # LEFT → RIGHT
-                        if cx > prev_x and track_state[track_id] != "in":
+                    # Crossing Logic
+                    if track_id in track_history:
+                        prev_x, prev_line_x = track_history[track_id]
+                        if prev_x < prev_line_x and cx >= current_line_x:
                             count_in += 1
-                            track_state[track_id] = "in"
-                            print(f"Person {track_id} IN | Total: {count_in}")
-                            cv2.line(frame, (line_x, 0), (line_x, h), (0, 255, 0), 4)
-
-                        # RIGHT → LEFT
-                        elif cx < prev_x and track_state[track_id] != "out":
+                        elif prev_x > prev_line_x and cx <= current_line_x:
                             count_out += 1
-                            track_state[track_id] = "out"
-                            print(f"Person {track_id} OUT | Total: {count_out}")
-                            cv2.line(frame, (line_x, 0), (line_x, h), (255, 0, 0), 4)
+                    
+                    track_history[track_id] = (cx, current_line_x)
 
-                track_history[track_id] = cx
+            current_occupancy = max(0, count_in - count_out)
 
-        cv2.putText(frame, f"IN: {count_in}", (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-        cv2.putText(frame, f"OUT: {count_out}", (20, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+            # 4. Periodic Data Sync (Every 120 seconds)
+            if time.time() - last_sync_time > 120:
+                m_id, d_id = get_current_context()
 
-        cv2.imshow("People Counter", frame)
+                # Run sync in background thread
+                sync_thread = threading.Thread(
+                    target=send_data_to_server,
+                    args=(current_occupancy, d_id),
+                    daemon=True
+                )
+                sync_thread.start()
+                last_sync_time = time.time()
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            # 5. Headless Cleanup & Terminal Status
+            # (cv2.imshow removed to prevent X11 errors)
+            if len(track_history) > 50:
+                recent_ids = list(track_history.keys())[-50:]
+                track_history = {k: track_history[k] for k in recent_ids}
 
-    cap.release()
-    cv2.destroyAllWindows()
+            # Optional: Print live occupancy to terminal every 10 seconds
+            if int(time.time()) % 10 == 0:
+                print(f"Live Occupancy: {current_occupancy} (In: {count_in}, Out: {count_out})", end='\r')
+
+            time.sleep(0.01) # Small delay to save CPU power
+
+    except KeyboardInterrupt:
+        print("\nStopping script...")
+    finally:
+        print("Closing System...")
+        picam2.stop()
 
 if __name__ == "__main__":
     main()
